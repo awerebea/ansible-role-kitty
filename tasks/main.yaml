@@ -35,6 +35,7 @@
             - '{{ kitty_download_dir }}'
             - '{{ kitty_install_dir }}'
             - '{{ kitty_bin_dir | default("") }}'
+            - '{{ kitty_desktop_file_dir | default("") }}'
 
         - name: Create directories in a loop.
           include_tasks: create-dir.yaml
@@ -51,6 +52,7 @@
         - '{{ kitty_download_dir }}'
         - '{{ kitty_install_dir }}'
         - '{{ kitty_bin_dir | default("") }}'
+        - '{{ kitty_desktop_file_dir | default("") }}'
 
     - name: Download the official installation script.
       get_url:
@@ -87,6 +89,62 @@
       when: kitty_bin_dir is defined
       become: '{{ not kitty_dirstatus.results[2].stat.writeable }}'
 
+    - name: Ensure the .desktop file exists in the desired location.
+      block:
+        - name: Modify the standard .desktop file from the installation package.
+          block:
+            - name: Expand any environment variables in the kitty_install_dir.
+              shell: printf %q "{{ kitty_install_dir }}"
+              args:
+                executable: /usr/bin/bash
+              register: kitty_expanded_install_dir
+
+            - name: Change Icon path.
+              lineinfile:
+                dest: "{{ kitty_install_dir }}/kitty.app/share/applications/\
+                kitty.desktop"
+                regexp: '^Icon=kitty$'
+                line: "Icon={{ kitty_expanded_install_dir.stdout }}/kitty.app/\
+                share/icons/hicolor/256x256/apps/kitty.png"
+                state: present
+                backrefs: true
+                backup: false
+
+            - name: Change Exec path.
+              lineinfile:
+                dest: "{{ kitty_install_dir }}/kitty.app/share/applications/\
+                kitty.desktop"
+                regexp: '^Exec=kitty$'
+                line: "Exec={{ kitty_expanded_install_dir.stdout }}/kitty.app/\
+                bin/kitty"
+                state: present
+                backrefs: true
+                backup: false
+
+          become: '{{ not kitty_dirstatus.results[1].stat.writeable }}'
+
+        - name: Copy the .desktop file to the desired location.
+          copy:
+            src: >-
+              {{ kitty_install_dir }}/kitty.app/share/applications/kitty.desktop
+            dest: '{{ kitty_desktop_file_dir }}/kitty.desktop'
+            mode: 0644
+            remote_src: true
+          become: '{{ not kitty_dirstatus.results[3].stat.writeable }}'
+
+      when: kitty_desktop_file_dir is defined
+
+    - name: Ensure the install path is in the system PATH.
+      lineinfile:
+        dest: '{{ item }}'
+        line: '[[ ":$PATH:" != *":{{ kitty_bin_dir }}:"* ]] &&
+        export PATH="$PATH:{{ kitty_bin_dir }}"'
+        state: present
+        backup: false
+      with_items: '{{ kitty_env_files_to_modify }}'
+      failed_when: false
+      when: kitty_env_files_to_modify | length > 0
+
   # Conditions for starting basic tasks: Kitty is not installed at the
   # desired/default kitty_install_dir directory path, or the installed
   # and desired versions do not match, or a force upgrade to the latest version
@@ -99,14 +157,3 @@
     or (kitty_version is defined and kitty_version | lower == 'nightly')
     or (update_apps is defined
     and ('all' in update_apps or 'kitty' in update_apps | lower))
-
-- name: Ensure the install path is in the system PATH.
-  lineinfile:
-    dest: '{{ item }}'
-    line: '[[ ":$PATH:" != *":{{ kitty_bin_dir }}:"* ]] &&
-    export PATH="$PATH:{{ kitty_bin_dir }}"'
-    state: present
-    backup: false
-  with_items: '{{ kitty_env_files_to_modify }}'
-  failed_when: false
-  when: kitty_env_files_to_modify | length > 0
