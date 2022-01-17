@@ -59,6 +59,7 @@ None.
   roles:
     - role: ansible-role-kitty
       kitty_bin_dir: $HOME/.local/bin
+      kitty_desktop_file_dir: $HOME/.local/share/applications
 ```
 
 ## License
