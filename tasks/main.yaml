@@ -34,6 +34,7 @@
           with_items:
             - '{{ kitty_download_dir }}'
             - '{{ kitty_install_dir }}'
+            - '{{ kitty_bin_dir }}'
 
         - name: Create directories in a loop.
           include_tasks: create-dir.yaml
@@ -49,6 +50,7 @@
       with_items:
         - '{{ kitty_download_dir }}'
         - '{{ kitty_install_dir }}'
+        - '{{ kitty_bin_dir }}'
 
     - name: Download the official installation script.
       get_url:
@@ -76,6 +78,14 @@
         launch=n"
       become: '{{ not kitty_dirstatus.results[1].stat.writeable }}'
 
+    - name: Make sure the link to the Kitty exists in the binary directory.
+      file:
+        src: '{{ kitty_install_dir }}/kitty.app/bin/kitty'
+        dest: '{{ kitty_bin_dir }}/kitty'
+        mode: 0755
+        state: link
+      become: '{{ not kitty_dirstatus.results[2].stat.writeable }}'
+
   # Conditions for starting basic tasks: Kitty is not installed at the
   # desired/default kitty_install_dir directory path, or the installed
   # and desired versions do not match, or a force upgrade to the latest version
@@ -91,8 +101,8 @@
 - name: Ensure the install path is in the system PATH.
   lineinfile:
     dest: '{{ item }}'
-    line: '[[ ":$PATH:" != *":{{ kitty_install_dir }}/bin:"* ]] &&
-    export PATH="$PATH:{{ kitty_install_dir }}/bin"'
+    line: '[[ ":$PATH:" != *":{{ kitty_bin_dir }}:"* ]] &&
+    export PATH="$PATH:{{ kitty_bin_dir }}"'
     state: present
     backup: false
   with_items: '{{ kitty_env_files_to_modify }}'
