@@ -98,7 +98,7 @@
     version(kitty_desired_ver, '!=', version_type='strict'))
     or (kitty_version is defined and kitty_version | lower == 'nightly')
     or (update_apps is defined
-    and ('all' in update_apps or 'kitty' in update_apps))
+    and ('all' in update_apps or 'kitty' in update_apps | lower))
 
 - name: Ensure the install path is in the system PATH.
   lineinfile:
