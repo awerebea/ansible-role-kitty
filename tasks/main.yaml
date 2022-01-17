@@ -3,7 +3,7 @@
 
 - name: Check Kitty version.
   shell: >
-    set -o pipefail && {{ kitty_install_dir }}/bin/kitty --version |
+    set -o pipefail && {{ kitty_install_dir }}/kitty.app/bin/kitty --version |
     grep -Eo "[0-9]{1,}(\.[0-9]{1,}){0,}" | head -n1
   args:
     executable: /usr/bin/bash
@@ -34,14 +34,14 @@
           with_items:
             - '{{ kitty_download_dir }}'
             - '{{ kitty_install_dir }}'
-            - '{{ kitty_bin_dir }}'
+            - '{{ kitty_bin_dir | default("") }}'
 
         - name: Create directories in a loop.
           include_tasks: create-dir.yaml
           vars:
             dir_path: '{{ item.item }}'
           with_items: '{{ kitty_dirstatus.results }}'
-          when: not item.stat.exists
+          when: not item.stat.exists and not item.item == ''
 
     - name: Update status of directories.
       stat:
@@ -50,7 +50,7 @@
       with_items:
         - '{{ kitty_download_dir }}'
         - '{{ kitty_install_dir }}'
-        - '{{ kitty_bin_dir }}'
+        - '{{ kitty_bin_dir | default("") }}'
 
     - name: Download the official installation script.
       get_url:
@@ -63,13 +63,14 @@
       get_url:
         url: "https://github.com/kovidgoyal/kitty/releases/download/\
         v{{ kitty_desired_ver }}/kitty-{{ kitty_desired_ver }}-x86_64.txz"
-        dest: '{{ kitty_install_dir }}/kitty-{{ kitty_desired_ver }}-x86_64.txz'
+        dest: "{{ kitty_download_dir }}/\
+        kitty-{{ kitty_desired_ver }}-x86_64.txz"
       when: kitty_desired_ver is defined
       become: '{{ not kitty_dirstatus.results[0].stat.writeable }}'
 
     - name: Install Kitty using the official installer.
       command: "{{ kitty_download_dir }}/installer.sh
-        {{ 'installer=\"' + kitty_install_dir + '/kitty-' + kitty_desired_ver +
+        {{ 'installer=\"' + kitty_download_dir + '/kitty-' + kitty_desired_ver +
         '-x86_64.txz\"' if kitty_desired_ver is defined
         else 'installer=nightly' if kitty_version is defined
         and kitty_version | lower == 'nightly' }}
@@ -83,6 +84,7 @@
         dest: '{{ kitty_bin_dir }}/kitty'
         mode: 0755
         state: link
+      when: kitty_bin_dir is defined
       become: '{{ not kitty_dirstatus.results[2].stat.writeable }}'
 
   # Conditions for starting basic tasks: Kitty is not installed at the
@@ -94,6 +96,7 @@
     or (kitty_desired_ver is defined
     and kitty_current_ver is
     version(kitty_desired_ver, '!=', version_type='strict'))
+    or (kitty_version is defined and kitty_version | lower == 'nightly')
     or (update_apps is defined
     and ('all' in update_apps or 'kitty' in update_apps))
 

@@ -1,5 +1,6 @@
 ---
 kitty_install_dir: $HOME/.local
-kitty_bin_dir: $HOME/.local/bin
-kitty_download_dir: /tmp/kitty-installer
+# kitty_bin_dir: /some/path   # Specify in the playbook to create a symbolic
+#                               link to the Kitty binary in this directory.
+kitty_download_dir: /tmp/kitty-installer-ansible
 kitty_env_files_to_modify: []
