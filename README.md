@@ -21,6 +21,10 @@ Available variables are listed below, along with default values (see `defaults/m
     # If not specified, the link and its containing directory will not be created.
     kitty_bin_dir: $HOME/.local/bin
 
+    # The path containing a modified copy of standard kitty.desktop file from the installation directory.
+    # If not specified, the copy of .desktop file and its containing directory will not be created.
+    kitty_desktop_file_dir: $HOME/.local/share/applications
+
     # If the directory for downloading installation script and release tarball is not specified,
     # /tmp/kitty-installer-ansible is used.
     kitty_download_dir: $HOME/Downloads/kitty
@@ -33,11 +37,12 @@ Available variables are listed below, along with default values (see `defaults/m
       - $HOME/.bashrc
       - $HOME/.zshenv
 
-**NOTE:** By default, the base tasks of a role are skipped if the application
-<br />is already installed in the desired installation directory and no version upgrade is required.
-<br />To create a symbolic link to the main Kitty program in the bin directory and the directory itself as needed,
-<br />after the Playbook has already been started once, you can force the base role tasks to run
-<br />by defining the `update_apps` variable and adding `kitty` to the list. For example:
+**NOTE:** By default, the base tasks of a role are skipped if the application is already installed in the desired
+<br />installation directory and no version upgrade is required.
+<br />&nbsp;&nbsp;&nbsp;&nbsp;If you want to create a symbolic link to the main Kitty program in the bin directory, or add a conditional export
+<br />to the system PATH of a directory with a link to the app binary, and create the appropriate directories as needed,
+<br />after the Playbook has already been run once, you can force the launch base role tasks by defining
+<br />the `update_apps` variable and adding `kitty` to the list. For example:
 ``` bash
 $ ansible-playbook main.yaml -e "update_apps=[kitty]"
 ```
