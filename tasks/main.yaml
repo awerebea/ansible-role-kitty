@@ -64,7 +64,6 @@
         url: "https://github.com/kovidgoyal/kitty/releases/download/\
         v{{ kitty_desired_ver }}/kitty-{{ kitty_desired_ver }}-x86_64.txz"
         dest: '{{ kitty_install_dir }}/kitty-{{ kitty_desired_ver }}-x86_64.txz'
-        remote_src: true
       when: kitty_desired_ver is defined
       become: '{{ not kitty_dirstatus.results[0].stat.writeable }}'
 
