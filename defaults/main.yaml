@@ -1,3 +1,4 @@
 ---
-kitty_install_prefix: /usr/local
+kitty_install_dir: $HOME/.local/kitty.app
+kitty_download_dir: /tmp/kitty-installer
 kitty_env_files_to_modify: []

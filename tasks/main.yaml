@@ -3,7 +3,7 @@
 
 - name: Check Kitty version.
   shell: >
-    set -o pipefail && {{ kitty_install_prefix }}/bin/kitty --version |
+    set -o pipefail && {{ kitty_install_dir }}/bin/kitty --version |
     grep -Eo "[0-9]{1,}(\.[0-9]{1,}){0,}" | head -n1
   args:
     executable: /usr/bin/bash
@@ -21,73 +21,63 @@
   set_fact:
     kitty_desired_ver: '{{ kitty_version |
     regex_search("[0-9]{1,}(\.[0-9]{1,}){0,2}") }}'
-  when: kitty_version is defined
+  when: kitty_version is defined and kitty_version | lower != 'nightly'
 
 - name: Basic tasks.
   block:
-    - block:
-        - name: Ensure pip3 is installed.
-          apt:
-            name: python3-pip
-            state: present
-          become: true
-
-        - name: Ensure required python module is installed.
-          pip:
-            name: github3.py
-
-        - name: Get latest release tag.
-          community.general.github_release:
-            user: kovidgoyal
-            repo: kitty
-            action: latest_release
-          register: kitty_latest_release
-
-      when: kitty_version is not defined
-
     - name: Create missing directories.
       block:
-        - name: Get status of install prefix directory.
+        - name: Get status of directories.
           stat:
-            path: '{{ kitty_install_prefix }}'
+            path: '{{ item }}'
           register: kitty_dirstatus
+          with_items:
+            - '{{ kitty_download_dir }}'
+            - '{{ kitty_install_dir }}'
 
-        - name: Create install directory.
-          block:
-            - name: Ensure install prefix directory exists.
-              file:
-                path: '{{ kitty_install_prefix }}'
-                state: directory
-                mode: 0755
+        - name: Create directories in a loop.
+          include_tasks: create-dir.yaml
+          vars:
+            dir_path: '{{ item.item }}'
+          with_items: '{{ kitty_dirstatus.results }}'
+          when: not item.stat.exists
 
-          rescue:
-            - name: Ensure install prefix directory exists, as root.
-              file:
-                path: '{{ kitty_install_prefix }}'
-                state: directory
-                mode: 0755
-              become: true
-
-          when: not kitty_dirstatus.stat.exists
-
-    - name: Update status of install prefix directory.
+    - name: Update status of directories.
       stat:
-        path: '{{ kitty_install_prefix }}'
+        path: '{{ item }}'
       register: kitty_dirstatus
+      with_items:
+        - '{{ kitty_download_dir }}'
+        - '{{ kitty_install_dir }}'
 
-    - name: Download and extract the archive.
-      unarchive:
-        src: "https://github.com/kovidgoyal/kitty/releases/download/\
-        {{ 'v' + kitty_desired_ver + '/kitty-' + kitty_desired_ver
-        if (kitty_desired_ver is defined)
-        else kitty_latest_release.tag + '/kitty-' + kitty_latest_release.tag |
-        regex_replace('^v', '') }}-x86_64.txz"
-        dest: '{{ kitty_install_prefix }}'
+    - name: Download the official installation script.
+      get_url:
+        url: https://sw.kovidgoyal.net/kitty/installer.sh
+        dest: '{{ kitty_download_dir }}/installer.sh'
+        mode: 0755
+      become: '{{ not kitty_dirstatus.results[0].stat.writeable }}'
+
+    - name: Download the release tarball.
+      get_url:
+        url: "https://github.com/kovidgoyal/kitty/releases/download/\
+        v{{ kitty_desired_ver }}/kitty-{{ kitty_desired_ver }}-x86_64.txz"
+        dest: '{{ kitty_install_dir }}/kitty-{{ kitty_desired_ver }}-x86_64.txz'
         remote_src: true
-      become: '{{ not kitty_dirstatus.stat.writeable | default(false) }}'
+      when: kitty_desired_ver is defined
+      become: '{{ not kitty_dirstatus.results[0].stat.writeable }}'
+
+    - name: Install Kitty using the official installer.
+      command: "{{ kitty_download_dir }}/installer.sh
+        {{ 'installer=\"' + kitty_install_dir + '/kitty-' + kitty_desired_ver +
+        '-x86_64.txz\"' if kitty_desired_ver is defined
+        else 'installer=nightly' if kitty_version is defined
+        and kitty_version | lower == 'nightly' }}
+        dest={{ kitty_install_dir }}
+        launch=n"
+      become: '{{ not kitty_dirstatus.results[1].stat.writeable }}'
 
   # Conditions for starting basic tasks: Kitty is not installed at the
-  # desired/default kitty_install_prefix directory path, or the installed
+  # desired/default kitty_install_dir directory path, or the installed
   # and desired versions do not match, or a force upgrade to the latest version
   # is defined (in which case the desired version should not be determined).
   when: >
@@ -101,8 +91,8 @@
 - name: Ensure the install path is in the system PATH.
   lineinfile:
     dest: '{{ item }}'
-    line: '[[ ":$PATH:" != *":{{ kitty_install_prefix }}/bin:"* ]] &&
-    export PATH="$PATH:{{ kitty_install_prefix }}/bin"'
+    line: '[[ ":$PATH:" != *":{{ kitty_install_dir }}/bin:"* ]] &&
+    export PATH="$PATH:{{ kitty_install_dir }}/bin"'
     state: present
     backup: false
   with_items: '{{ kitty_env_files_to_modify }}'
